@@ -63,6 +63,7 @@ function processPhotos(Response : any, goLive : boolean = true) : Photo[] {
             try {
                 checkIfCameraIsValid(photo.camera.name);
                 JSON_RES.push({id: photo.id, src: photo.img_src, camera: photo.camera.name});
+                console.log(JSON_RES);
             } catch (invalidTypeError) {
                 console.log(invalidTypeError);
             }
@@ -97,8 +98,11 @@ function makeAxiosGetReqForPhotos(urlReq : string, request : any, response : any
     }
 }
 
+function getUrlWithAppendedPage(url : string, page : number) : string {
+    return url + `&page=${page}`;
+}
 function makeAxiosGetReqForOnePage(url : string, page : number, request : any, response : any) : void {
-    makeAxiosGetReqForPhotos(url + `&page=${page}`, request, response);
+    makeAxiosGetReqForPhotos(getUrlWithAppendedPage(url, page), request, response);
 }
 
 function makeAxiosGetReqForPageRange(url : string, request: any, response : any) : void {
@@ -108,9 +112,27 @@ function makeAxiosGetReqForPageRange(url : string, request: any, response : any)
     if (pageStart !== undefined) {
         if (pageEnd === undefined) {
             makeAxiosGetReqForOnePage(url, (pageDef === undefined ? 1 : pageDef), request, response); // default page argument = 1;
-        }
-        for (let page : number = pageStart; page <= pageEnd; ++page) {
-            makeAxiosGetReqForOnePage(url, page, request, response);
+        } else {
+            let endpoints : Array<string> = [];
+            for (let page : number = pageStart; page <= pageEnd; ++page) {
+                endpoints.push(getUrlWithAppendedPage(url, page));
+/*
+                makeAxiosGetReqForOnePage(url, page, request, response);
+*/
+            }
+
+            let photoGallery : Photo[] = [];
+            axios.all(endpoints.map((endpoint: string ): void => {
+                axios.get(endpoint)
+                    .then(function (API_RESPONSE: any): void {
+                        let photoRes : Photo[] = processPhotos(API_RESPONSE);
+                        console.log(photoRes);
+                        photoGallery.push(...photoRes);
+                    })
+                    .catch((e): void => {
+                        console.log(e);
+                    })
+            })).then(() => response.send(photoGallery)).catch((e) => console.log(e));
         }
     } else if (pageDef !== undefined) {
         makeAxiosGetReqForOnePage(url, pageDef, request, response);
@@ -118,6 +140,17 @@ function makeAxiosGetReqForPageRange(url : string, request: any, response : any)
         makeAxiosGetReqForOnePage(url, 1, request, response); // default page argument = 1;
     }
 }
+
+router.get("/rovers/:rover/photos/:camera/:sol", (request : any, response : any) : void => {
+    const requestURL : string = `https://api.nasa.gov/mars-photos/api/v1/rovers/${request.params["rover"]}/photos?sol=${request.params["sol"]}&camera=${request.params["camera"]}&api_key=${API_KEY}`;
+    makeAxiosGetReqForPageRange(requestURL, request, response);
+});
+
+router.get("/rovers/:rover/photos/:camera/:earth_date", (request : any, response : any) : void => {
+    const requestURL : string = `https://api.nasa.gov/mars-photos/api/v1/rovers/${request.params["rover"]}/photos?earth_date=${request.params["earth_date"]}&camera=${request.params["camera"]}&api_key=${API_KEY}`;
+    makeAxiosGetReqForPageRange(requestURL, request, response);
+});
+
 
 router.get("/rovers/:rover/photos/", (request : any, response : any) : void => {
     try {
@@ -138,17 +171,6 @@ router.get("/rovers/:rover/photos/", (request : any, response : any) : void => {
         console.log(error);
     }
 });
-
-router.get("/rovers/:rover/photos/camera=:camera/sol=:sol", (request : any, response : any) : void => {
-    const requestURL : string = `https://api.nasa.gov/mars-photos/api/v1/rovers/${request.params["rover"]}/photos?sol=${request.params["sol"]}&camera=${request.params["camera"]}&api_key=${API_KEY}`;
-    makeAxiosGetReqForPageRange(requestURL, request, response);
-});
-
-router.get("/rovers/:rover/photos/camera=:camera/earth_date=:earth_date", (request : any, response : any) : void => {
-    const requestURL : string = `https://api.nasa.gov/mars-photos/api/v1/rovers/${request.params["rover"]}/photos?earth_date=${request.params["earth_date"]}&camera=${request.params["camera"]}&api_key=${API_KEY}`;
-    makeAxiosGetReqForPageRange(requestURL, request, response);
-});
-
 
 app.listen(port, () : void => {
     console.log("Test backend is running on port " + port);
