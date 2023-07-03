@@ -6,11 +6,15 @@ const fs = require("fs");
 const app = express();
 const port : number = 8000;
 const API_KEY : string = "w79BVY7YHOsF11hE0SJXVzWc35B5aCTI4Pb8gOuO";
+const CORS = require("cors");
 
 app.use(express.json());
+app.use(CORS());
+
 const router = express.Router();
 router.get('/test', (request : any, response : any) => response.send("Hello world!"));
 app.use("/", router);
+
 
 interface Rover {
     id : number,
@@ -18,6 +22,7 @@ interface Rover {
     status: string,
     landing_date: string,
     launch_date: string;
+    cameras: string[]
 };
 
 enum CameraType {
@@ -44,7 +49,8 @@ router.get("/rovers", (request : any, response : any) : void => {
         .then(function(API_RESPONSE : any) : void {
             const JSON_RES : Rover[] = [];
             Array.from(API_RESPONSE.data.rovers).forEach(function (rover : any) : void {
-                JSON_RES.push( {id : rover.id, name: rover.name, status: rover.status, landing_date: rover.landing_date, launch_date: rover.launch_date});
+                JSON_RES.push( {id : rover.id, name: rover.name, status: rover.status, landing_date: rover.landing_date, launch_date: rover.launch_date
+                ,cameras: rover.cameras.map((roverEntry : Rover) => roverEntry.name)});
             })
             response.send(JSON_RES);
         });
