@@ -1,4 +1,5 @@
 import axios from "axios";
+import {response} from "express";
 
 const express = require("express");
 const fs = require("fs");
@@ -15,6 +16,19 @@ const router = express.Router();
 router.get('/test', (request : any, response : any) => response.send("Hello world!"));
 app.use("/", router);
 
+const db = require("knex")( {
+    client: "pg",
+    connection: {
+        host: "localhost",
+        user: "postgres",
+        password: "pami",
+        database: "knex-test",
+        port: 5432
+    }
+});
+
+
+app.set("db", db);
 
 interface Rover {
     id : number,
@@ -43,18 +57,97 @@ interface Photo {
     camera : CameraType;
 };
 
+router.get("/seed", function(req : any, res : any, next : any) {
+    const db = req.app.get("db");
+    db.schema.hasTable("rovers").then(function (exists : any) {
+        if (!exists) {
+            db.schema
+                .createTable("rovers", function(table : any) {
+                    table.increments("id").primary();
+                    table.string("name").notNullable();
+                    table.string("status").notNullable();
+                })
+                .then(function() {
+                    const records = [ {"name": "Curiosity", "status": "active"} ];
+                    db("rovers")
+                        .insert(records)
+                        .then(() => {
+                            res.send("Seeded data");
+                        });
+                });
+        }
+    })
+});
+
 
 router.get("/rovers", (request : any, response : any) : void => {
     axios.get(`https://api.nasa.gov/mars-photos/api/v1/rovers/?api_key=${API_KEY}`)
         .then(function(API_RESPONSE : any) : void {
             const JSON_RES : Rover[] = [];
             Array.from(API_RESPONSE.data.rovers).forEach(function (rover : any) : void {
-                JSON_RES.push( {id : rover.id, name: rover.name, status: rover.status, landing_date: rover.landing_date, launch_date: rover.launch_date
-                ,cameras: rover.cameras.map((roverEntry : Rover) => roverEntry.name)});
+                JSON_RES.push( {id : rover.id, name: rover.name, status: rover.status, landing_date: rover.landing_date, launch_date: rover.launch_date,
+                    cameras: rover.cameras.map((roverEntry : Rover) => roverEntry.name)});
             })
             response.send(JSON_RES);
         });
 });
+
+router.get("/db/rovers", function(req : any, res : any, next : any) {
+    const db = req.app.get('db');
+    db.schema.hasTable("rovers")
+        .then(function (exists: boolean): void {
+            if (!exists) {
+                db.schema
+                    .createTable("rovers", function(table : any) {
+                        table.increments("id").primary();
+                        table.string("name").notNullable();
+                        table.string("status").notNullable();
+                        table.date("landing_date").notNullable();
+                        table.date("launch_date").notNullable();
+                    })
+                    .then(async function() {
+                        let rovers = await axios.get("http://localhost:8000/rovers");
+                        db["rovers"].insert(rovers);
+                        response.send("done!");
+                    })
+            } else {
+                return db
+                    .select("*")
+                    .from("rovers")
+                    .then((rows : any) => res.send(rows));
+            }
+        })
+})
+router.get("/seed", function(req : any, res : any, next : any) {
+    const db = req.app.get('db');
+    db.schema.hasTable("users").then(function(exists : any) {
+        if (!exists) {
+            db.schema
+                .createTable("users", function(table : any) {
+                    table.increments("id").primary();
+                    table.string("name");
+                    table.string("email");
+                })
+                .then(function() {
+                    const recordsLength = Array.from(Array(100).keys());
+                    const records = recordsLength.map(rec => ({
+                        name: "a",
+                        email: "b"
+                    }));
+                    db("users")
+                        .insert(records)
+                        .then(() => {
+                            res.send(records);
+                        });
+                });
+        } else {
+            db.select("*")
+                .from("users")
+                .then((rows : any) => res.send(rows));
+        }
+    });
+});
+
 
 function checkIfCameraIsValid(cameraName : any) : void {
     if (!Object.values(CameraType).includes(cameraName)) {
