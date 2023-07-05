@@ -57,30 +57,64 @@ interface Photo {
     camera : CameraType;
 };
 
-/*router.get("/seed", function(req : any, res : any, next : any) {
-    const db = req.app.get("db");
-    db.schema.hasTable("rovers").then(function (exists : any) {
-        if (!exists) {
-            db.schema
-                .createTable("rovers", function(table : any) {
-                    table.increments("id").primary();
-                    table.string("name").notNullable();
-                    table.string("status").notNullable();
-                })
-                .then(function() {
-                    const records = [ {"name": "Curiosity", "status": "active"} ];
-                    db("rovers")
-                        .insert(records)
-                        .then(() => {
-                            res.send("Seeded data");
-                        });
-                });
+interface RoverDatabaseInterface {
+    name : string,
+    status : string,
+    launch_date: string,
+    landing_date : string
+}
+
+function mapRovers(rovers : any) : RoverDatabaseInterface[] {
+    return rovers.map((rover: any): RoverDatabaseInterface => {
+        return {
+            name: rover.name,
+            status: rover.status,
+            landing_date: rover.landing_date,
+            launch_date: rover.launch_date
         }
     })
-});*/
+}
 
 
 router.get("/rovers", (request : any, response : any) : void => {
+/*    db.schema.hasTable("rovers")
+        .then(function(exists : boolean) {
+            if (!exists) {
+                db.schema
+                    .createTable("rovers", function(table : any) {
+                        table.increments("id").primary();
+                        table.string("name").notNullable();
+                        table.string("status").notNullable();
+                        table.string("landing_date").notNullable();
+                        table.string("launch_date").notNullable();
+                    })
+                    .then(function() {
+                        axios.get(`https://api.nasa.gov/mars-photos/api/v1/rovers/?api_key=${API_KEY}`)
+                            .then((rovers : any) => {
+                                return rovers.data.rovers;
+                            })
+                            .then((rovers : any) => {
+                                console.log(mapRovers(rovers));
+                                db("rovers").insert(mapRovers(rovers))
+                                    .then(() => {
+                                        db("rovers")
+                                            .then((rovers : any) : void => {
+                                                response.send(rovers);
+                                            })
+                                    });
+                            })
+                    })
+            } else {
+                db("rovers")
+                    .then((rovers : any) : void => {
+                        response.send(rovers);
+                    })
+            }
+        })*/
+  /*  db("rovers")
+        .then((rovers : any) : void => {
+            response.send(rovers);
+        })*/
     axios.get(`https://api.nasa.gov/mars-photos/api/v1/rovers/?api_key=${API_KEY}`)
         .then(function(API_RESPONSE : any) : void {
             const JSON_RES : Rover[] = [];
@@ -89,7 +123,12 @@ router.get("/rovers", (request : any, response : any) : void => {
                     cameras: rover.cameras.map((roverEntry : Rover) => roverEntry.name)});
             })
             response.send(JSON_RES);
-        });
+        })
+        .catch((error) : void => {
+            console.log(error);
+            response.code(429);
+            response.send(error);
+        })
 });
 
 router.get("/db/rovers", function(req : any, res : any, next : any) {
@@ -102,28 +141,26 @@ router.get("/db/rovers", function(req : any, res : any, next : any) {
                         table.increments("id").primary();
                         table.string("name").notNullable();
                         table.string("status").notNullable();
-                        table.date("landing_date").notNullable();
-                        table.date("launch_date").notNullable();
+                        table.string("landing_date").notNullable();
+                        table.string("launch_date").notNullable();
                     })
-                    .then(async function() {
-                        axios.get("http://localhost:8000/rovers")
+                    .then(function() {
+                        axios.get(`https://api.nasa.gov/mars-photos/api/v1/rovers/?api_key=${API_KEY}`)
                             .then((rovers : any) => {
-                                db("rovers").insert(rovers);
-                                res.send(JSON.stringify(rovers));
+                                return rovers.data.rovers;
                             })
-                    })
+                            .then((rovers : any) => {
+                                console.log(mapRovers(rovers));
+                                db("rovers").insert(mapRovers(rovers))
+                                    .then(() => res.send("done"));
+                            })})
             } else {
-                axios.get("http://localhost:8000/rovers")
-                    .then((rovers : any) : void => {
-                        db("rovers").insert(rovers);
-                    })
-                    .then(function() : void {
-                       res.send(JSON.stringify(db
-                           .from("rovers")
-                           .select("*")));
-                    });
+                db
+                        .from("rovers")
+                        .select("*")
+                        .then((rows : any) => res.send(rows));
             }
-        })
+        });
 })
 router.get("/seed", function(req : any, res : any, next : any) {
     const db = req.app.get('db');
