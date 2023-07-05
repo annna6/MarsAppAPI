@@ -1,5 +1,5 @@
 import axios from "axios";
-import {response} from "express";
+import {faker} from "@faker-js/faker";
 
 const express = require("express");
 const fs = require("fs");
@@ -57,7 +57,7 @@ interface Photo {
     camera : CameraType;
 };
 
-router.get("/seed", function(req : any, res : any, next : any) {
+/*router.get("/seed", function(req : any, res : any, next : any) {
     const db = req.app.get("db");
     db.schema.hasTable("rovers").then(function (exists : any) {
         if (!exists) {
@@ -77,7 +77,7 @@ router.get("/seed", function(req : any, res : any, next : any) {
                 });
         }
     })
-});
+});*/
 
 
 router.get("/rovers", (request : any, response : any) : void => {
@@ -106,24 +106,31 @@ router.get("/db/rovers", function(req : any, res : any, next : any) {
                         table.date("launch_date").notNullable();
                     })
                     .then(async function() {
-                        let rovers = await axios.get("http://localhost:8000/rovers");
-                        db["rovers"].insert(rovers);
-                        response.send("done!");
+                        axios.get("http://localhost:8000/rovers")
+                            .then((rovers : any) => {
+                                db("rovers").insert(rovers);
+                                res.send(JSON.stringify(rovers));
+                            })
                     })
             } else {
-                return db
-                    .select("*")
-                    .from("rovers")
-                    .then((rows : any) => res.send(rows));
+                axios.get("http://localhost:8000/rovers")
+                    .then((rovers : any) : void => {
+                        db("rovers").insert(rovers);
+                    })
+                    .then(function() : void {
+                       res.send(JSON.stringify(db
+                           .from("rovers")
+                           .select("*")));
+                    });
             }
         })
 })
 router.get("/seed", function(req : any, res : any, next : any) {
     const db = req.app.get('db');
-    db.schema.hasTable("users").then(function(exists : any) {
+    db.schema.hasTable("users-data").then(function(exists : boolean) {
         if (!exists) {
             db.schema
-                .createTable("users", function(table : any) {
+                .createTable("users-data", function(table : any) {
                     table.increments("id").primary();
                     table.string("name");
                     table.string("email");
@@ -131,10 +138,10 @@ router.get("/seed", function(req : any, res : any, next : any) {
                 .then(function() {
                     const recordsLength = Array.from(Array(100).keys());
                     const records = recordsLength.map(rec => ({
-                        name: "a",
-                        email: "b"
+                        name: faker.person.firstName() + " " + faker.person.lastName(),
+                        email: faker.internet.email()
                     }));
-                    db("users")
+                    db("users-data")
                         .insert(records)
                         .then(() => {
                             res.send(records);
@@ -142,7 +149,7 @@ router.get("/seed", function(req : any, res : any, next : any) {
                 });
         } else {
             db.select("*")
-                .from("users")
+                .from("users-data")
                 .then((rows : any) => res.send(rows));
         }
     });
